@@ -18,14 +18,15 @@ Attribute assembly.VB_VarHelpID = -1
 Private WithEvents drawing As SldWorks.DrawingDoc
 Attribute drawing.VB_VarHelpID = -1
 
+Dim utilities As swCustomUtilities.UtilitiesOptions
 Dim doc As SldWorks.ModelDoc2
-Dim docExt As SldWorks.ModelDocExtension
 
 
-Private Sub Class_Initialize()
+Public Sub initialize(ByRef swApp As SldWorks.SldWorks, ByRef utilityOptions As swCustomUtilities.UtilitiesOptions)
     logger.add "swEventHandler Initialized..."
     Set app = swApp
-    Set doc = swApp.ActivateDoc
+    Set doc = swApp.ActiveDoc
+    Set utilities = utilityOptions
     
     updateModels
     
@@ -33,49 +34,63 @@ End Sub
 
 
 Private Sub updateModels()
-    Select Case doc.GetType
-        Case swDocNONE
-            Set part = Nothing
-            Set assembly = Nothing
-            Set drawing = Nothing
-        Case swDocPART
-            Set part = doc
-            Set assembly = Nothing
-            Set drawing = Nothing
-        Case swDocASSEMBLY
-            Set part = Nothing
-            Set assembly = doc
-            Set drawing = Nothing
-        Case swDocDRAWING
-            Set part = Nothing
-            Set assembly = Nothing
-            Set drawing = doc
-    End Select
-    
-    Set docExt = doc.Extension
+    If Not doc Is Nothing Then
+        Select Case (doc.GetType)
+            Case swDocNONE
+                Set part = Nothing
+                Set assembly = Nothing
+                Set drawing = Nothing
+            Case swDocPART
+                Set part = doc
+                Set assembly = Nothing
+                Set drawing = Nothing
+            Case swDocASSEMBLY
+                Set part = Nothing
+                Set assembly = doc
+                Set drawing = Nothing
+            Case swDocDRAWING
+                Set part = Nothing
+                Set assembly = Nothing
+                Set drawing = doc
+        End Select
+    End If
     
 End Sub
 
 
 Private Function app_ActiveModelDocChangeNotify() As Long
-    Set doc = app.ActivateDoc
+    Set doc = app.ActiveDoc
     updateModels
     
-    logger.add "Active model set to: " & doc.GetTitle
+    If doc Is Nothing Then
+        logger.add "Active model set to: Nothing"
+    Else
+        logger.add "Active model set to: " & doc.GetTitle
+    End If
     
 End Function
 
 
-Private Function app_FileOpenPostNotify(ByVal FileName As String) As Long
-    logger.add "File opened: " & FileName
-
+Private Function app_FileOpenNotify2(ByVal fileName As String) As Long
+    logger.add "File opened: " & fileName
+    
+    logger.add module_SaveExport.fileSummary(doc)
+    
 End Function
 
 
-Private Function part_FileSavePostNotify(ByVal saveType As Long, ByVal FileName As String) As Long
+Private Function part_FileSavePostNotify(ByVal saveType As Long, ByVal fileName As String) As Long
     Select Case saveType
         Case swFileSave
-            logger.add "file save"
+            logger.add "File saved: " & fileName
+            
+            If utilities.saveExport Then
+                If UCase((module_SaveExport.getFileExt(fileName))) = "SLDPRT" Then
+                    module_SaveExport.exportStep doc
+                    
+                End If
+            End If
+            
         Case swFileSaveAs
             ' File save as routines
         Case swFileSaveAsCopy
@@ -85,4 +100,3 @@ Private Function part_FileSavePostNotify(ByVal saveType As Long, ByVal FileName 
     End Select
     
 End Function
-
